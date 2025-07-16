@@ -632,31 +632,10 @@ async function main() {
       }
       await new Promise((resolve) => setTimeout(resolve, randomTime));
       if (currentTime.getMinutes() !== screenshotTime.getMinutes()) {
-        // take screenshot every minute, and get round index
+        // 已取消每分钟截图功能
         let screenshotIndex = Math.round((currentTime - startTime) / 60000);
-        await driver.takeScreenshot().then((image, err) => {
-          fs.writeFileSync(
-            `./data/screenshot-${screenshotIndex}.png`,
-            image,
-            "base64"
-          );
-        });
         screenshotTime = currentTime;
         console.info("Reading minute: ", screenshotIndex);
-
-        // if the screenshot png size is less than 100 KB, then refresh the page
-        // continue if file not found
-        if (!fs.existsSync(`./data/screenshot-${screenshotIndex}.png`)) {
-          continue;
-        }
-        let stats = fs.statSync(`./data/screenshot-${screenshotIndex}.png`);
-        let fileSizeInBytes = stats.size;
-        let fileSizeInKB = fileSizeInBytes / 1024;
-        console.debug("Screenshot size: ", fileSizeInKB, " KB");
-        if (fileSizeInKB < 100) {
-          await driver.navigate().refresh();
-          console.info("Page refreshed.");
-        }
       }
 
       // check if need to jump to the top
