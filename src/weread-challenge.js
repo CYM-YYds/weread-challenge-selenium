@@ -619,7 +619,7 @@ async function main() {
     console.info("Start time: ", startTime);
     let endTime = new Date(startTime.getTime() + WEREAD_DURATION * 60000);
     console.info("End time: ", endTime);
-    let screenshotTime = startTime;
+    // let screenshotTime = startTime; // 注释掉每分钟截图功能
     // log last read time per minute
     while (new Date() < endTime) {
       let currentTime = new Date();
@@ -631,6 +631,8 @@ async function main() {
         randomTime = Math.floor(Math.random() * 400) + 200;
       }
       await new Promise((resolve) => setTimeout(resolve, randomTime));
+      // 注释掉每分钟截图功能
+      /*
       if (currentTime.getMinutes() !== screenshotTime.getMinutes()) {
         // take screenshot every minute, and get round index
         let screenshotIndex = Math.round((currentTime - startTime) / 60000);
@@ -658,6 +660,7 @@ async function main() {
           console.info("Page refreshed.");
         }
       }
+      */
 
       // check if need to jump to the top
       // check if the doc title contains "已读完"
