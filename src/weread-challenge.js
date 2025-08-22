@@ -269,6 +269,13 @@ async function sendMail(subject, text, filePaths = []) {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
     },
+    // SSL/TLS选项 - 修复武汉理工大学邮箱证书不匹配问题
+    tls: {
+      // 不验证证书（解决证书不匹配问题）
+      rejectUnauthorized: false,
+      // 忽略服务器名称验证
+      servername: process.env.EMAIL_SMTP
+    },
   });
 
   // Convert image paths to attachments array
@@ -597,16 +604,7 @@ async function main() {
     );
     console.info("Successfully switched to vertical scroll mode.");
 
-    if (ENABLE_EMAIL) {
-      await driver
-        .takeScreenshot()
-        .then((image, err) =>
-          fs.writeFileSync("./data/screenshot.png", image, "base64")
-        );
-      await sendMail("[项目进展--项目启动]", "Login successful.", [
-        "./data/screenshot.png",
-      ]);
-    }
+    // 移除启动时的邮件通知 - 只在程序完成时发送邮件
 
     // run script to keep reading
     // let script = fs.readFileSync("./src/keep_reading.js", "utf8");
