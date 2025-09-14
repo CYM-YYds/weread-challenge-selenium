@@ -261,7 +261,7 @@ async function sendMail(subject, text, filePaths = []) {
   const secure = EMAIL_PORT === 465;
   
   // Create transporter object using SMTP transport
-  let transporter = nodemailer.createTransporter({
+  let transporter = nodemailer.createTransport({
     host: process.env.EMAIL_SMTP,
     port: EMAIL_PORT,
     secure: secure, // true for 465, false for other ports
@@ -453,139 +453,101 @@ async function main() {
       fs.mkdirSync("./data");
     }
 
-    // Check if already logged in by looking for "我的书架"
-    await new Promise((resolve) => setTimeout(resolve, 2000)); // wait for page to load
-    let bookshelfLinks = await driver.findElements(
-      By.xpath("//div[contains(text(), '我的书架') and @class='wr_index_page_top_section_header_action_link']")
+    // Check if "Login" hyperlink exists
+    console.info("Find login links...");
+    let loginLinks = await driver.findElements(
+      By.xpath("//a[contains(text(), '登录')]"),
+      10000
     );
-    
-    if (bookshelfLinks.length > 0) {
-      console.info("Already logged in, found bookshelf link.");
-    } else {
-      // Check if "Login" hyperlink exists
-      console.info("Find login links...");
-      let loginLinks = await driver.findElements(
-        By.xpath("//a[contains(text(), '登录')]"),
+    if (loginLinks.length > 0) {
+      console.info("Login link found. Clicking...");
+      // 避免点击不成功
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await loginLinks[0].click();
+      // if div contains text "扫码登录微信读书" then get screenshot
+      await driver.wait(
+        until.elementLocated(
+          By.xpath("//div[contains(text(), '扫码登录微信读书')]")
+        ),
         10000
       );
-      if (loginLinks.length > 0) {
-        console.info("Login link found. Clicking...");
-        // 避免点击不成功
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        await loginLinks[0].click();
-        
-        // Wait for login modal to appear
-        try {
-          await driver.wait(
-            until.elementLocated(
-              By.xpath("//div[contains(text(), '扫码登录微信读书')]")
-            ),
-            10000
-          );
-          // 避免截图时二维码还未弹出
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-          // save screenshot of QR code
-          await driver.takeScreenshot().then((image, err) => {
-            fs.writeFileSync(LOGIN_QR_CODE, image, "base64");
-          });
-          console.info("QR code saved, datetime: ", new Date());
-        } catch (e) {
-          console.warn("Could not find QR code modal, might already be logged in");
-        }
-        
-        // Wait for login completion
-        let locator1 = By.xpath(
-          "//div[contains(text(), '点击刷新二维码') and @class='wr_login_modal_qr_overlay_text']"
-        );
-        let locator2 = By.xpath(
-          "//div[contains(text(), '我的书架') and @class='wr_index_page_top_section_header_action_link']"
-        );
+      // 避免截图时二维码还未弹出
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // save screenshot of QR code
+      await driver.takeScreenshot().then((image, err) => {
+        fs.writeFileSync(LOGIN_QR_CODE, image, "base64");
+      });
+      console.info("QR code saved, datetime: ", new Date());
+    }
 
-        let maxRetries = 3;
-        while (maxRetries-- > 0) {
-          console.info("Waiting for login...");
-          try {
-            const element = await driver.wait(
-              new Promise((resolve, reject) => {
-                driver
-                  .wait(until.elementLocated(locator1), 300000)
-                  .then(resolve)
-                  .catch(() => { });
-                driver
-                  .wait(until.elementLocated(locator2), 300000)
-                  .then(resolve)
-                  .catch(() => { });
-              }),
-              300000 // 5 minutes
-            );
+    let locator1 = By.xpath(
+      "//div[contains(text(), '点击刷新二维码') and @class='wr_login_modal_qr_overlay_text']"
+    );
+    let locator2 = By.xpath(
+      "//div[contains(text(), '我的书架') and @class='wr_index_page_top_section_header_action_link']"
+    );
 
-            if (element === undefined) {
-              console.info("no element found");
-              continue;
-            }
+    let maxRetries = 3;
+    while (maxRetries-- > 0) {
+      console.info("Waiting for login...");
+      const element = await driver.wait(
+        new Promise((resolve, reject) => {
+          driver
+            .wait(until.elementLocated(locator1), 300000)
+            .then(resolve)
+            .catch(() => { });
+          driver
+            .wait(until.elementLocated(locator2), 300000)
+            .then(resolve)
+            .catch(() => { });
+        }),
+        300000 // 5 minutes
+      );
 
-            let text = await element.getText();
-            // if text contains "我的书架", then login is successful
-            if (text.includes("我的书架")) {
-              console.info("Login completed.");
-              break;
-            }
-
-            // if text contains "点击刷新二维码", then click on it
-            if (text.includes("点击刷新二维码")) {
-              console.info("Refreshing QR code...");
-              await element.click();
-
-              // if div contains text "扫码登录微信读书" then get screenshot
-              await driver.wait(
-                until.elementLocated(
-                  By.xpath("//div[contains(text(), '扫码登录微信读书')]")
-                ),
-                10000
-              );
-
-              // 避免截图时二维码还未弹出
-              await new Promise((resolve) => setTimeout(resolve, 1000));
-
-              // save screenshot
-              await driver.takeScreenshot().then((image, err) => {
-                fs.writeFileSync(LOGIN_QR_CODE, image, "base64");
-              });
-
-              console.info("QR code refreshed, datetime: ", new Date());
-              continue;
-            }
-          } catch (loginError) {
-            console.warn("Login wait error:", loginError.message);
-            // Check if we're actually already logged in
-            let bookshelfCheck = await driver.findElements(
-              By.xpath("//div[contains(text(), '我的书架') and @class='wr_index_page_top_section_header_action_link']")
-            );
-            if (bookshelfCheck.length > 0) {
-              console.info("Already logged in after error check.");
-              break;
-            }
-          }
-        }
-
-        if (maxRetries <= 0) {
-          // Final check if we're logged in
-          let finalBookshelfCheck = await driver.findElements(
-            By.xpath("//div[contains(text(), '我的书架') and @class='wr_index_page_top_section_header_action_link']")
-          );
-          if (finalBookshelfCheck.length === 0) {
-            console.error("Failed to login.");
-            if (ENABLE_EMAIL) {
-              await sendMail("[项目进展--项目停滞]", "Failed to login.");
-            }
-            return;
-          } else {
-            console.info("Login successful after final check.");
-          }
-        }
-      } else {
-        console.info("No login link found, assuming already logged in.");
+      if (element === undefined) {
+        console.info("no element found");
+        continue;
       }
+
+      let text = await element.getText();
+      // if text contains "我的书架", then login is successful
+      if (text.includes("我的书架")) {
+        console.info("Login completed.");
+        break;
+      }
+
+      // if text contains "点击刷新二维码", then click on it
+      if (text.includes("点击刷新二维码")) {
+        console.info("Refreshing QR code...");
+        await element.click();
+
+        // if div contains text "扫码登录微信读书" then get screenshot
+        await driver.wait(
+          until.elementLocated(
+            By.xpath("//div[contains(text(), '扫码登录微信读书')]")
+          ),
+          10000
+        );
+
+        // 避免截图时二维码还未弹出
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+
+        // save screenshot
+        await driver.takeScreenshot().then((image, err) => {
+          fs.writeFileSync(LOGIN_QR_CODE, image, "base64");
+        });
+
+        console.info("QR code refreshed, datetime: ", new Date());
+        continue;
+      }
+    }
+
+    if (maxRetries <= 0) {
+      console.error("Failed to login.");
+      if (ENABLE_EMAIL) {
+        await sendMail("[项目进展--项目停滞]", "Failed to login.");
+      }
+      return;
     }
 
     console.info("Successfully logged in.");
@@ -668,6 +630,35 @@ async function main() {
       }
       await new Promise((resolve) => setTimeout(resolve, randomTime));
       // 注释掉每分钟截图功能
+      /*
+      if (currentTime.getMinutes() !== screenshotTime.getMinutes()) {
+        // take screenshot every minute, and get round index
+        let screenshotIndex = Math.round((currentTime - startTime) / 60000);
+        await driver.takeScreenshot().then((image, err) => {
+          fs.writeFileSync(
+            `./data/screenshot-${screenshotIndex}.png`,
+            image,
+            "base64"
+          );
+        });
+        screenshotTime = currentTime;
+        console.info("Reading minute: ", screenshotIndex);
+
+        // if the screenshot png size is less than 100 KB, then refresh the page
+        // continue if file not found
+        if (!fs.existsSync(`./data/screenshot-${screenshotIndex}.png`)) {
+          continue;
+        }
+        let stats = fs.statSync(`./data/screenshot-${screenshotIndex}.png`);
+        let fileSizeInBytes = stats.size;
+        let fileSizeInKB = fileSizeInBytes / 1024;
+        console.debug("Screenshot size: ", fileSizeInKB, " KB");
+        if (fileSizeInKB < 100) {
+          await driver.navigate().refresh();
+          console.info("Page refreshed.");
+        }
+      }
+      */
 
       // check if need to jump to the top
       // check if the doc title contains "已读完"
