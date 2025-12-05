@@ -23,7 +23,7 @@ const DEBUG = process.env.DEBUG === "true" || false; // Enable debug mode
 const WEREAD_USER = process.env.WEREAD_USER || "weread-default"; // User to use
 const WEREAD_REMOTE_BROWSER = process.env.WEREAD_REMOTE_BROWSER;
 const WEREAD_DURATION = process.env.WEREAD_DURATION || 10; // Reading duration in minutes
-const WEREAD_SPEED = process.env.WEREAD_SPEED || "slow"; // Reading speed, slow | normal | fast
+const WEREAD_SPEED = process.env.WEREAD_SPEED || "normal"; // Reading speed, slow | normal | fast
 const WEREAD_SELECTION = process.env.WEREAD_SELECTION || 2; // Selection method
 const WEREAD_BROWSER = process.env.WEREAD_BROWSER || Browser.CHROME; // Browser to use, chrome | MicrosoftEdge | firefox
 const ENABLE_EMAIL = process.env.ENABLE_EMAIL === "true" || false; // Enable email notifications
